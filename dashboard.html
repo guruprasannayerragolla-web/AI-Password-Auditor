@@ -1,0 +1,1118 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Password Auditor - Interactive Security Dashboard</title>
+    <!-- Outfit Google Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Outfit', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    },
+                    colors: {
+                        cyber: {
+                            bg: '#0B0F19',
+                            card: 'rgba(17, 24, 39, 0.7)',
+                            border: 'rgba(51, 65, 85, 0.4)',
+                            glow: '#00F0FF',
+                            accent: '#F000FF',
+                            success: '#10B981',
+                            warning: '#F59E0B',
+                            danger: '#EF4444'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    
+    <style>
+        body {
+            background-color: #05070C;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(16, 185, 129, 0.05) 0px, transparent 50%),
+                radial-gradient(at 100% 0%, rgba(240, 0, 255, 0.05) 0px, transparent 50%),
+                radial-gradient(at 50% 100%, rgba(0, 240, 255, 0.05) 0px, transparent 50%);
+            background-attachment: fixed;
+        }
+        
+        .neon-border {
+            box-shadow: 0 0 10px rgba(0, 240, 255, 0.15), inset 0 0 10px rgba(0, 240, 255, 0.05);
+            border: 1px solid rgba(0, 240, 255, 0.3);
+        }
+        
+        .neon-border-accent {
+            box-shadow: 0 0 10px rgba(240, 0, 255, 0.15), inset 0 0 10px rgba(240, 0, 255, 0.05);
+            border: 1px solid rgba(240, 0, 255, 0.3);
+        }
+
+        .cyber-grid {
+            background-size: 40px 40px;
+            background-image: 
+                linear-gradient(to right, rgba(51, 65, 85, 0.05) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(51, 65, 85, 0.05) 1px, transparent 1px);
+        }
+        
+        /* Glassmorphism scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(11, 15, 25, 0.5);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(51, 65, 85, 0.5);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #00F0FF;
+        }
+    </style>
+</head>
+<body class="text-slate-200 min-h-screen flex flex-col cyber-grid pb-12">
+
+    <!-- Top Navigation Bar -->
+    <header class="border-b border-slate-800 bg-slate-950/80 backdrop-blur-md sticky top-0 z-50 px-6 py-4">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-4">
+            <div class="flex items-center gap-3">
+                <div class="p-2 bg-gradient-to-tr from-cyan-500 to-fuchsia-500 rounded-lg shadow-[0_0_15px_rgba(0,240,255,0.4)]">
+                    <i data-lucide="shield-check" class="w-6 h-6 text-slate-900"></i>
+                </div>
+                <div>
+                    <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-cyan-400 via-sky-300 to-fuchsia-400 bg-clip-text text-transparent">
+                        AI Password Auditor
+                    </h1>
+                    <p class="text-xs text-slate-500 font-mono">INTELLIGENT RISK ASSESSMENT LAB</p>
+                </div>
+            </div>
+            
+            <div class="flex items-center gap-4 font-mono text-xs">
+                <!-- Audit Mode -->
+                <div class="bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 flex items-center gap-2">
+                    <span class="text-slate-500">AUDIT DEPTH:</span>
+                    <select id="auditMode" class="bg-transparent text-cyan-400 font-semibold focus:outline-none cursor-pointer">
+                        <option value="BASIC" class="bg-slate-950 text-slate-200">BASIC</option>
+                        <option value="ADVANCED" class="bg-slate-950 text-slate-200" selected>ADVANCED</option>
+                        <option value="ENTERPRISE" class="bg-slate-950 text-slate-200">ENTERPRISE (DB LOG)</option>
+                    </select>
+                </div>
+                
+                <!-- Status indicator -->
+                <div id="apiStatusContainer" class="bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 flex items-center gap-2">
+                    <div id="statusPulse" class="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse"></div>
+                    <span id="apiStatusText" class="text-amber-500 font-semibold">CONNECTING TO API...</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="max-w-7xl mx-auto w-full px-4 md:px-6 mt-8 flex-grow grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- Left Side: Inputs & Personal Context (4 Cols) -->
+        <section class="lg:col-span-4 flex flex-col gap-6">
+            
+            <!-- Audit Input Card -->
+            <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-5 backdrop-blur-md relative overflow-hidden flex flex-col gap-4">
+                <div class="absolute top-0 left-0 w-1 h-full bg-cyan-400"></div>
+                <h2 class="text-lg font-semibold flex items-center gap-2 text-cyan-400">
+                    <i data-lucide="key-round" class="w-5 h-5"></i> Password Assessment
+                </h2>
+                
+                <!-- Password Input -->
+                <div class="flex flex-col gap-1.5">
+                    <label class="text-xs font-semibold text-slate-400" for="passwordInput">PASSWORD UNDER AUDIT</label>
+                    <div class="relative">
+                        <input type="password" id="passwordInput" placeholder="Enter password to scan..." 
+                               class="w-full bg-slate-900 border border-slate-700 focus:border-cyan-400 focus:outline-none focus:ring-1 focus:ring-cyan-400 rounded-lg px-3 py-3 pr-10 font-mono text-sm tracking-wider text-slate-100 transition-colors">
+                        <button type="button" id="togglePasswordVisibility" class="absolute right-3 top-3.5 text-slate-500 hover:text-slate-300">
+                            <i data-lucide="eye" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- AI suggestion buttons -->
+                <div class="grid grid-cols-2 gap-2 mt-1">
+                    <button id="btnSuggestPassphrase" class="bg-slate-900 hover:bg-slate-850 border border-slate-700 hover:border-cyan-500 text-cyan-400 rounded-lg py-2 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all">
+                        <i data-lucide="sparkles" class="w-3.5 h-3.5"></i> Suggest Passphrase
+                    </button>
+                    <button id="btnSuggestRandom" class="bg-slate-900 hover:bg-slate-850 border border-slate-700 hover:border-cyan-500 text-cyan-400 rounded-lg py-2 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all">
+                        <i data-lucide="dice-5" class="w-3.5 h-3.5"></i> Random Secure
+                    </button>
+                </div>
+            </div>
+            
+            <!-- Personal Exposure Context Card -->
+            <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-5 backdrop-blur-md relative overflow-hidden flex flex-col gap-4">
+                <div class="absolute top-0 left-0 w-1 h-full bg-fuchsia-400"></div>
+                <h2 class="text-lg font-semibold flex items-center gap-2 text-fuchsia-400">
+                    <i data-lucide="fingerprint" class="w-5 h-5"></i> OSINT Context Profile
+                </h2>
+                <p class="text-xs text-slate-500">
+                    Attackers harvest public profile details to customize dictionary sweeps. Provide fields to scan for identity-leak vulnerability.
+                </p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-1 gap-3 text-xs">
+                    <div>
+                        <label class="block text-slate-400 mb-1" for="username">USERNAME</label>
+                        <input id="username" placeholder="e.g. johndoe" class="w-full bg-slate-900 border border-slate-850 rounded-lg p-2.5 focus:border-fuchsia-400 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1" for="email">EMAIL ADDRESS</label>
+                        <input id="email" placeholder="e.g. john@doe.org" class="w-full bg-slate-900 border border-slate-850 rounded-lg p-2.5 focus:border-fuchsia-400 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1" for="firstName">FIRST NAME</label>
+                        <input id="firstName" placeholder="e.g. John" class="w-full bg-slate-900 border border-slate-850 rounded-lg p-2.5 focus:border-fuchsia-400 focus:outline-none">
+                    </div>
+                    <div>
+                        <label class="block text-slate-400 mb-1" for="lastName">LAST NAME</label>
+                        <input id="lastName" placeholder="e.g. Doe" class="w-full bg-slate-900 border border-slate-850 rounded-lg p-2.5 focus:border-fuchsia-400 focus:outline-none">
+                    </div>
+                    <div class="md:col-span-2 lg:col-span-1">
+                        <label class="block text-slate-400 mb-1" for="orgName">ORGANIZATION</label>
+                        <input id="orgName" placeholder="e.g. Acme Corp" class="w-full bg-slate-900 border border-slate-850 rounded-lg p-2.5 focus:border-fuchsia-400 focus:outline-none">
+                    </div>
+                </div>
+            </div>
+            
+        </section>
+
+        <!-- Right Side: Metrics Dashboard (8 Cols) -->
+        <section class="lg:col-span-8 flex flex-col gap-6">
+            
+            <!-- Real-time Summary & Score Panel -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                
+                <!-- Security Score Circular Gauge -->
+                <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-5 backdrop-blur-md flex flex-col items-center justify-center gap-3 text-center min-h-[220px]">
+                    <span class="text-xs font-semibold text-slate-400 tracking-wider">SECURITY RATIO</span>
+                    
+                    <div class="relative w-28 h-28 flex items-center justify-center">
+                        <!-- Circle SVG -->
+                        <svg class="absolute w-full h-full -rotate-90">
+                            <circle cx="56" cy="56" r="48" stroke="rgba(30, 41, 59, 0.8)" stroke-width="8" fill="transparent" />
+                            <circle id="scoreProgressCircle" cx="56" cy="56" r="48" stroke="#10B981" stroke-dasharray="301.6" stroke-dashoffset="301.6" stroke-width="8" stroke-linecap="round" fill="transparent" class="transition-all duration-500" />
+                        </svg>
+                        <div class="text-center">
+                            <span id="scoreText" class="text-3xl font-extrabold text-slate-100">0</span>
+                            <span class="text-slate-400 text-sm">/100</span>
+                        </div>
+                    </div>
+                    
+                    <span id="classificationBadge" class="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-900 text-slate-400 border border-slate-700">
+                        INACTIVE
+                    </span>
+                </div>
+                
+                <!-- Entropy Scores -->
+                <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-5 backdrop-blur-md flex flex-col justify-between gap-4">
+                    <div>
+                        <span class="text-xs font-semibold text-slate-400 tracking-wider">CRYPTOGRAPHIC RANDOMNESS</span>
+                        <div class="mt-2 flex items-baseline gap-1">
+                            <span id="entropyValue" class="text-3xl font-bold text-cyan-400 font-mono">0.0</span>
+                            <span class="text-slate-500 text-xs">bits</span>
+                        </div>
+                        <p id="entropyCategory" class="text-xs text-slate-400 mt-1 font-semibold">Ready to scan</p>
+                    </div>
+                    
+                    <div class="border-t border-slate-800/80 pt-3 flex flex-col gap-2">
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-400">Shannon Entropy:</span>
+                            <span id="shannonEntropy" class="font-mono text-slate-200">0.0 bits</span>
+                        </div>
+                        <div class="flex justify-between text-xs">
+                            <span class="text-slate-400">Effective Entropy:</span>
+                            <span id="effectiveEntropy" class="font-mono text-slate-200">0.0 bits</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Machine Learning Risk Classifier -->
+                <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-5 backdrop-blur-md flex flex-col justify-between gap-4">
+                    <div>
+                        <span class="text-xs font-semibold text-slate-400 tracking-wider">AI PREDICTED RISK LEVEL</span>
+                        <div class="mt-3 flex items-center gap-2">
+                            <div id="mlRiskIndicator" class="w-3.5 h-3.5 rounded-full bg-slate-800"></div>
+                            <span id="mlRiskText" class="text-xl font-bold text-slate-400 tracking-wide font-mono">WAITING</span>
+                        </div>
+                        <p class="text-xs text-slate-500 mt-1">Based on Random Forest classification.</p>
+                    </div>
+                    
+                    <div>
+                        <div class="flex justify-between text-xs mb-1 font-mono">
+                            <span class="text-slate-400">ML Confidence:</span>
+                            <span id="mlConfidenceText" class="text-slate-200">0.0%</span>
+                        </div>
+                        <div class="w-full bg-slate-900 rounded-full h-2 overflow-hidden border border-slate-800">
+                            <div id="mlConfidenceBar" class="bg-slate-800 h-full w-0 transition-all duration-300"></div>
+                        </div>
+                    </div>
+                </div>
+                
+            </div>
+            
+            <!-- Graphic Chart & Simulation Panels -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <!-- Threat Radar Chart -->
+                <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-5 backdrop-blur-md flex flex-col gap-4">
+                    <span class="text-xs font-semibold text-slate-400 tracking-wider flex items-center gap-1.5">
+                        <i data-lucide="radar" class="w-4 h-4 text-cyan-400"></i> AUDIT RISK PROFILE RADAR
+                    </span>
+                    <div class="relative w-full h-56 flex items-center justify-center">
+                        <canvas id="radarChart"></canvas>
+                    </div>
+                </div>
+                
+                <!-- AI Attack resistance estimators -->
+                <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-5 backdrop-blur-md flex flex-col justify-between gap-4">
+                    <span class="text-xs font-semibold text-slate-400 tracking-wider flex items-center gap-1.5">
+                        <i data-lucide="clock" class="w-4 h-4 text-fuchsia-400"></i> OFF-LINE GPU CRACK ESTIMATES
+                    </span>
+                    
+                    <div class="flex flex-col gap-3 font-mono text-xs">
+                        <div class="bg-slate-900/60 p-2.5 rounded-lg border border-slate-850 flex justify-between items-center">
+                            <div>
+                                <span class="text-slate-400 block text-[10px]">THROTTLED ONLINE PORTAL</span>
+                                <span class="text-slate-500 text-[9px]">(10 guesses/sec rate-limited)</span>
+                            </div>
+                            <span id="crackOnline" class="text-slate-200 font-semibold">0.0s</span>
+                        </div>
+                        
+                        <div class="bg-slate-900/60 p-2.5 rounded-lg border border-slate-850 flex justify-between items-center">
+                            <div>
+                                <span class="text-slate-400 block text-[10px]">OFFLINE GPU SLOW HASH</span>
+                                <span class="text-slate-500 text-[9px]">(Bcrypt/Argon2 slow KDF)</span>
+                            </div>
+                            <span id="crackSlow" class="text-slate-200 font-semibold">0.0s</span>
+                        </div>
+                        
+                        <div class="bg-slate-900/60 p-2.5 rounded-lg border border-slate-850 flex justify-between items-center">
+                            <div>
+                                <span class="text-slate-400 block text-[10px]">OFFLINE GPU FAST HASH</span>
+                                <span class="text-slate-500 text-[9px]">(MD5/SHA-256 RTX 4090 cluster)</span>
+                            </div>
+                            <span id="crackFast" class="text-cyan-400 font-semibold">0.0s</span>
+                        </div>
+                        
+                        <div class="bg-slate-900/60 p-2.5 rounded-lg border border-slate-850 flex justify-between items-center">
+                            <div>
+                                <span class="text-slate-400 block text-[10px]">AI-ASSISTED GUESSING</span>
+                                <span class="text-slate-500 text-[9px]">(PassGAN Neural Structure guess)</span>
+                            </div>
+                            <span id="crackAI" class="text-fuchsia-400 font-semibold">0.0s</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- XAI Insights & Recommendations Grid -->
+            <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+                <!-- XAI (6 Cols) -->
+                <div class="md:col-span-7 bg-slate-950/70 border border-slate-800 rounded-xl p-5 backdrop-blur-md flex flex-col gap-3">
+                    <span class="text-xs font-semibold text-slate-400 tracking-wider flex items-center gap-1.5">
+                        <i data-lucide="bot" class="w-4 h-4 text-cyan-400"></i> EXPLAINABLE AI (XAI) BRIEF
+                    </span>
+                    <div class="bg-slate-900/40 p-4 rounded-lg border border-slate-800/80 min-h-[140px] flex items-center">
+                        <p id="xaiBrief" class="text-sm text-slate-300 leading-relaxed italic">
+                            Enter a password to initiate the deep neural model analysis...
+                        </p>
+                    </div>
+                    <div id="vulnTags" class="flex flex-wrap gap-1.5 mt-2">
+                        <!-- tags injected here -->
+                    </div>
+                </div>
+                
+                <!-- Recommendations Checklist (5 Cols) -->
+                <div class="md:col-span-5 bg-slate-950/70 border border-slate-800 rounded-xl p-5 backdrop-blur-md flex flex-col justify-between gap-4">
+                    <span class="text-xs font-semibold text-slate-400 tracking-wider flex items-center gap-1.5">
+                        <i data-lucide="list-checks" class="w-4 h-4 text-fuchsia-400"></i> REMEDIATION ACTION ITEMS
+                    </span>
+                    
+                    <div id="recsContainer" class="flex flex-col gap-2 max-h-[150px] overflow-y-auto pr-1 text-xs">
+                        <div class="text-slate-500 text-center py-6">No suggestions generated yet</div>
+                    </div>
+                    
+                    <!-- Exporter buttons -->
+                    <div class="border-t border-slate-850 pt-3 flex gap-2">
+                        <button id="btnDownloadPDF" class="flex-1 bg-gradient-to-r from-cyan-500 to-sky-500 hover:from-cyan-400 hover:to-sky-400 text-slate-950 rounded-lg py-2.5 text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-[0_0_10px_rgba(0,240,255,0.2)]">
+                            <i data-lucide="file-text" class="w-4 h-4"></i> Export PDF
+                        </button>
+                        <button id="btnDownloadCSV" class="bg-slate-900 hover:bg-slate-850 border border-slate-700 hover:border-slate-500 text-slate-200 rounded-lg p-2.5 text-xs font-semibold transition-all">
+                            <i data-lucide="download" class="w-4 h-4"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Comparison Lab Dashboard -->
+            <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-5 backdrop-blur-md flex flex-col gap-4">
+                <span class="text-xs font-semibold text-slate-400 tracking-wider flex items-center gap-1.5">
+                    <i data-lucide="sliders-horizontal" class="w-4 h-4 text-cyan-400"></i> PASSWORD COMPARISON LAB
+                </span>
+                <p class="text-xs text-slate-500">
+                    Compare up to 5 passwords simultaneously to audit and rank credential strengths.
+                </p>
+                
+                <div class="grid grid-cols-1 md:grid-cols-5 gap-3 mt-1">
+                    <input id="compPwd1" placeholder="Password A..." class="bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs focus:outline-none focus:border-cyan-400 font-mono">
+                    <input id="compPwd2" placeholder="Password B..." class="bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs focus:outline-none focus:border-cyan-400 font-mono">
+                    <input id="compPwd3" placeholder="Password C..." class="bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs focus:outline-none focus:border-cyan-400 font-mono">
+                    <input id="compPwd4" placeholder="Password D..." class="bg-slate-900 border border-slate-800 rounded-lg p-2.5 text-xs focus:outline-none focus:border-cyan-400 font-mono">
+                    <button id="btnRunComparison" class="bg-slate-900 hover:bg-cyan-500 border border-cyan-500 text-cyan-400 hover:text-slate-950 rounded-lg p-2.5 text-xs font-bold flex items-center justify-center gap-1.5 transition-all">
+                        <i data-lucide="zap" class="w-4 h-4"></i> Compare
+                    </button>
+                </div>
+                
+                <div class="overflow-x-auto border border-slate-850 rounded-lg mt-3">
+                    <table class="w-full text-left border-collapse text-xs">
+                        <thead>
+                            <tr class="bg-slate-900 border-b border-slate-800 text-slate-400 font-mono">
+                                <th class="p-3">RANK</th>
+                                <th class="p-3">CREDENTIAL</th>
+                                <th class="p-3">SCORE</th>
+                                <th class="p-3">EFFECTIVE ENTROPY</th>
+                                <th class="p-3">RISK RATIO</th>
+                                <th class="p-3 text-right">CRACK TIME</th>
+                            </tr>
+                        </thead>
+                        <tbody id="comparisonTableBody">
+                            <tr>
+                                <td colspan="6" class="p-4 text-center text-slate-500">Add credentials and click compare to rank.</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+            
+        </section>
+        
+    </main>
+
+    <!-- Footer -->
+    <footer class="max-w-7xl mx-auto w-full px-6 mt-12 text-center text-xs text-slate-600 font-mono">
+        <p>AI PASSWORD AUDITOR &copy; 2026. ACADEMIC FINAL-YEAR UG RESEARCH SHOWCASE &bull; DESIGNED BY ANTIGRAVITY</p>
+    </footer>
+
+    <!-- Core Interactive Script -->
+    <script>
+        // DOM Elements
+        const pwdInput = document.getElementById('passwordInput');
+        const toggleVisibility = document.getElementById('togglePasswordVisibility');
+        const auditMode = document.getElementById('auditMode');
+        
+        const username = document.getElementById('username');
+        const email = document.getElementById('email');
+        const firstName = document.getElementById('firstName');
+        const lastName = document.getElementById('lastName');
+        const orgName = document.getElementById('orgName');
+        
+        const scoreText = document.getElementById('scoreText');
+        const scoreCircle = document.getElementById('scoreProgressCircle');
+        const classificationBadge = document.getElementById('classificationBadge');
+        
+        const entropyValue = document.getElementById('entropyValue');
+        const entropyCategory = document.getElementById('entropyCategory');
+        const shannonEntropy = document.getElementById('shannonEntropy');
+        const effectiveEntropy = document.getElementById('effectiveEntropy');
+        
+        const mlRiskIndicator = document.getElementById('mlRiskIndicator');
+        const mlRiskText = document.getElementById('mlRiskText');
+        const mlConfidenceText = document.getElementById('mlConfidenceText');
+        const mlConfidenceBar = document.getElementById('mlConfidenceBar');
+        
+        const crackOnline = document.getElementById('crackOnline');
+        const crackSlow = document.getElementById('crackSlow');
+        const crackFast = document.getElementById('crackFast');
+        const crackAI = document.getElementById('crackAI');
+        
+        const xaiBrief = document.getElementById('xaiBrief');
+        const vulnTags = document.getElementById('vulnTags');
+        const recsContainer = document.getElementById('recsContainer');
+        
+        const apiStatusPulse = document.getElementById('statusPulse');
+        const apiStatusText = document.getElementById('apiStatusText');
+        
+        // Exporters
+        const btnPDF = document.getElementById('btnDownloadPDF');
+        const btnCSV = document.getElementById('btnDownloadCSV');
+        
+        // Suggest buttons
+        const btnPassphrase = document.getElementById('btnSuggestPassphrase');
+        const btnRandom = document.getElementById('btnSuggestRandom');
+        
+        // Comparison lab
+        const btnCompare = document.getElementById('btnRunComparison');
+        const compTable = document.getElementById('comparisonTableBody');
+
+        // Global state variables
+        let isBackendOnline = false;
+        let radarChartInstance = null;
+        const apiHost = "http://127.0.0.1:8000";
+
+        // Initialize Lucide Icons
+        lucide.createIcons();
+
+        // 1. Initial State Hashing / Ping API Server
+        async function checkBackendStatus() {
+            try {
+                const res = await fetch(`${apiHost}/api/v1/health`);
+                if (res.ok) {
+                    const data = await res.json();
+                    isBackendOnline = true;
+                    apiStatusPulse.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse";
+                    apiStatusText.innerText = "FASTAPI BACKEND ONLINE";
+                    apiStatusText.className = "text-emerald-500 font-semibold";
+                    console.log("[API] Connected to database backend: ", data.database_engine);
+                }
+            } catch (err) {
+                isBackendOnline = false;
+                apiStatusPulse.className = "w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse";
+                apiStatusText.innerText = "API SERVER OFFLINE - RUNNING LOCAL ENGINE";
+                apiStatusText.className = "text-rose-500 font-semibold";
+                console.warn("[API] Server offline, falling back to client-side heuristic audit models.");
+            }
+        }
+        
+        // Check once at launch
+        checkBackendStatus();
+        // Check every 10 seconds in the background
+        setInterval(checkBackendStatus, 10000);
+
+        // 2. SVG Circular Gauge Progress Updates
+        function updateCircleGauge(score) {
+            const r = 48;
+            const circ = 2 * Math.PI * r; // 301.59
+            const offset = circ - (score / 100) * circ;
+            scoreCircle.style.strokeDashoffset = offset;
+            
+            // Adjust coloring
+            if (score >= 80) {
+                scoreCircle.setAttribute('stroke', '#10B981'); // Green
+                classificationBadge.className = "px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-950/60 text-emerald-400 border border-emerald-800";
+            } else if (score >= 50) {
+                scoreCircle.setAttribute('stroke', '#F59E0B'); // Orange
+                classificationBadge.className = "px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-950/60 text-amber-400 border border-amber-800";
+            } else {
+                scoreCircle.setAttribute('stroke', '#EF4444'); // Red
+                classificationBadge.className = "px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-950/60 text-rose-400 border border-rose-800";
+            }
+        }
+
+        // 3. Local Heuristic Engine (In-browser fallback if backend API is not running)
+        function clientSideFallbackAudit(pwd, userStr, emailStr, firstStr, lastStr, orgStr) {
+            const len = pwd.length;
+            if (len === 0) return getZeroStateResponse();
+            
+            // Composition checks
+            let hasUpper = /[A-Z]/.test(pwd);
+            let hasLower = /[a-z]/.test(pwd);
+            let hasDigit = /[0-9]/.test(pwd);
+            let hasSymbol = /[^A-Za-z0-9\s]/.test(pwd);
+            
+            let alphabetSize = 0;
+            if (hasUpper) alphabetSize += 26;
+            if (hasLower) alphabetSize += 26;
+            if (hasDigit) alphabetSize += 10;
+            if (hasSymbol) alphabetSize += 33;
+            
+            const uniqueChars = new Set(pwd).size;
+            const uniqueness = uniqueChars / len;
+            
+            // Patterns
+            const patterns = [];
+            if (/qwerty|asdfgh|zxcvbn/i.test(pwd)) {
+                patterns.push({ pattern_type: "KEYBOARD_WALK", pattern_value: "qwerty/asdf", start_index: 0, end_index: 5, severity: "HIGH" });
+            }
+            if (/12345|abcdef|12345678/i.test(pwd)) {
+                patterns.push({ pattern_type: "SEQUENCE", pattern_value: "12345", start_index: 0, end_index: 4, severity: "HIGH" });
+            }
+            // Repetitive runs
+            let repMatch = /(.)\1{2,}/.exec(pwd);
+            if (repMatch) {
+                patterns.push({ pattern_type: "REPEATED_CHAR", pattern_value: repMatch[0], start_index: repMatch.index, end_index: repMatch.index + repMatch[0].length - 1, severity: "MEDIUM" });
+            }
+            
+            // Dictionary simulation
+            const commonTerms = ["password", "letmein", "admin", "welcome", "root", "oracle", "secret", "master", "login", "shadow"];
+            let dictMatch = false;
+            let matchedTerm = "";
+            for (let term of commonTerms) {
+                if (pwd.toLowerCase().includes(term)) {
+                    dictMatch = true;
+                    matchedTerm = term;
+                    break;
+                }
+            }
+            
+            // Personal Info leak
+            const exposures = [];
+            if (userStr && pwd.toLowerCase().includes(userStr.toLowerCase())) {
+                exposures.push({ field_exposed: "USERNAME", matched_substring: userStr, match_type: "SUBSTRING" });
+            }
+            if (firstStr && pwd.toLowerCase().includes(firstStr.toLowerCase())) {
+                exposures.push({ field_exposed: "FIRST_NAME", matched_substring: firstStr, match_type: "SUBSTRING" });
+            }
+            if (orgStr && pwd.toLowerCase().includes(orgStr.toLowerCase())) {
+                exposures.push({ field_exposed: "ORGANIZATION", matched_substring: orgStr, match_type: "SUBSTRING" });
+            }
+
+            // Shannon Entropy: H = -sum(p_i * log2(p_i))
+            const charCounts = {};
+            for (let c of pwd) charCounts[c] = (charCounts[c] || 0) + 1;
+            let shannon = 0;
+            for (let c in charCounts) {
+                let p = charCounts[c] / len;
+                shannon -= p * Math.log2(p);
+            }
+            shannon = Math.round(shannon * 100) / 100;
+            
+            // NIST Entropy
+            let charSetEntropy = Math.round(len * Math.log2(alphabetSize || 1) * 100) / 100;
+            
+            // Effective Entropy
+            let effective = charSetEntropy - (patterns.length * 5) - (dictMatch ? 15 : 0) - (exposures.length * 8);
+            if (uniqueness < 0.6) effective *= (uniqueness + 0.4);
+            effective = Math.max(0.0, Math.round(effective * 100) / 100);
+            
+            // Scores (0-100)
+            let baseScore = Math.min(len * 5, 40) + ((hasUpper + hasLower + hasDigit + hasSymbol) * 8);
+            if (len > 12) baseScore += (len - 12) * 3;
+            baseScore += (uniqueness * 10);
+            if (dictMatch) baseScore = Math.min(15, baseScore);
+            if (exposures.length > 0) baseScore = Math.min(25, baseScore);
+            let finalScore = Math.max(0, Math.min(100, Math.round(baseScore)));
+            
+            // Risk & classification
+            let risk = "MEDIUM";
+            let classification = "Moderate Strength";
+            let mlIndicatorColor = "bg-amber-500";
+            if (finalScore < 30) {
+                risk = "CRITICAL";
+                classification = "Highly Vulnerable";
+                mlIndicatorColor = "bg-rose-500";
+            } else if (finalScore < 50) {
+                risk = "HIGH";
+                classification = "Weak Casing / Length";
+                mlIndicatorColor = "bg-orange-500";
+            } else if (finalScore >= 80) {
+                risk = "SECURE";
+                classification = "Cryptographically Protected";
+                mlIndicatorColor = "bg-emerald-500";
+            } else if (finalScore >= 65) {
+                risk = "LOW";
+                classification = "Strong Protection";
+                mlIndicatorColor = "bg-green-500";
+            }
+            
+            // Crack Time Calculations
+            const space = Math.pow(alphabetSize || 1, len);
+            const rOnline = formatTime(space / 20);
+            const rSlow = formatTime(space / 20000);
+            const rFast = dictMatch ? "Instantaneous" : formatTime(space / 2e11);
+            const rAI = dictMatch ? "Instantaneous" : formatTime((space / (patterns.length * 100 + 1)) / 2e7);
+            
+            // Explainable AI explanation
+            let xai = `The client engine predicts a '${risk}' status. The password contains ${len} characters with an effective entropy of ${effective} bits. `;
+            if (dictMatch) xai += `It exposes the dictionary word '${matchedTerm}', which allows guessing tools to compromise it instantly. `;
+            if (exposures.length > 0) xai += `It contains personal profile references, violating basic OSINT isolation parameters. `;
+            if (patterns.length > 0) xai += `It incorporates keyboard path sequences or repetitions. `;
+            if (!dictMatch && exposures.length === 0 && finalScore >= 80) xai = `The client engine predicts a 'SECURE' status. The password features excellent entropy, no sequential walks, and zero identity exposures.`;
+
+            // Recommendations
+            const recs = [];
+            if (len < 10) recs.push({ priority: "HIGH", recommendation_text: "Lengthen to 14+ characters to resist GPU brute forcing." });
+            if (dictMatch) recs.push({ priority: "HIGH", recommendation_text: "Remove common dictionary terms." });
+            if (exposures.length > 0) recs.push({ priority: "HIGH", recommendation_text: "Do not reuse personal information in passwords." });
+            if (patterns.length > 0) recs.push({ priority: "MEDIUM", recommendation_text: "Avoid sequences like '123' or keyboard paths like 'qwerty'." });
+            if (!hasSymbol) recs.push({ priority: "MEDIUM", recommendation_text: "Include special characters to expand search pools." });
+            if (finalScore < 80) recs.push({ priority: "MEDIUM", recommendation_text: "Switch to a passphrase by combining 4 random words." });
+
+            return {
+                security_score: finalScore,
+                entropy_score: charSetEntropy,
+                effective_entropy: effective,
+                risk_level: risk,
+                classification: classification,
+                dictionary_matched: dictMatch,
+                patterns_detected: patterns,
+                personal_info_exposed: exposures,
+                crack_time_formatted: rFast,
+                ml_risk_prediction: risk,
+                ml_confidence: 0.85,
+                xai_explanation: xai,
+                recommendations: recs,
+                fallback_crack_times: { online: rOnline, slow: rSlow, fast: rFast, ai: rAI }
+            };
+        }
+        
+        function getZeroStateResponse() {
+            return {
+                security_score: 0,
+                entropy_score: 0.0,
+                effective_entropy: 0.0,
+                risk_level: "CRITICAL",
+                classification: "INACTIVE",
+                dictionary_matched: false,
+                patterns_detected: [],
+                personal_info_exposed: [],
+                crack_time_formatted: "0.0s",
+                ml_risk_prediction: "CRITICAL",
+                ml_confidence: 1.0,
+                xai_explanation: "Enter a password to initiate the deep neural model analysis...",
+                recommendations: [],
+                fallback_crack_times: { online: "0.0s", slow: "0.0s", fast: "0.0s", ai: "0.0s" }
+            };
+        }
+        
+        function formatTime(seconds) {
+            if (seconds === Infinity || isNaN(seconds)) return "Centuries (Cryptographically Secure)";
+            if (seconds < 0.001) return "Instantaneous";
+            if (seconds < 1) return `${Math.round(seconds * 1000)}ms`;
+            if (seconds < 60) return `${Math.round(seconds)}s`;
+            if (seconds < 3600) return `${Math.round(seconds / 60)} min`;
+            if (seconds < 86400) return `${Math.round(seconds / 3600)} hrs`;
+            if (seconds < 31536000) return `${Math.round(seconds / 86400)} days`;
+            if (seconds < 31536000 * 1000) return `${Math.round(seconds / 31536000)} years`;
+            return "Centuries (Cryptographically Secure)";
+        }
+
+        // 4. Update the Dashboard Interface
+        function updateDashboard(data) {
+            // Update Score Gauge
+            scoreText.innerText = data.security_score;
+            updateCircleGauge(data.security_score);
+            classificationBadge.innerText = data.classification;
+            
+            // Update Entropy Card
+            entropyValue.innerText = data.effective_entropy.toFixed(1);
+            shannonEntropy.innerText = `${data.entropy_score.toFixed(1)} bits`;
+            effectiveEntropy.innerText = `${data.effective_entropy.toFixed(1)} bits`;
+            
+            // Cat text
+            if (data.effective_entropy < 28) {
+                entropyCategory.innerText = "Very Low (Easily Guessable)";
+                entropyCategory.className = "text-xs text-rose-400 mt-1 font-semibold";
+            } else if (data.effective_entropy < 60) {
+                entropyCategory.innerText = "Moderate (Acceptable)";
+                entropyCategory.className = "text-xs text-amber-400 mt-1 font-semibold";
+            } else {
+                entropyCategory.innerText = "Strong Cryptographic Randomness";
+                entropyCategory.className = "text-xs text-emerald-400 mt-1 font-semibold";
+            }
+            
+            // Update ML Risk Card
+            mlRiskText.innerText = data.ml_risk_prediction;
+            mlConfidenceText.innerText = `${(data.ml_confidence * 100).toFixed(1)}%`;
+            mlConfidenceBar.style.width = `${data.ml_confidence * 100}%`;
+            
+            // Set Indicator Color
+            let mlColor = "bg-slate-700";
+            let mlTextColor = "text-slate-400";
+            if (data.ml_risk_prediction === "CRITICAL") {
+                mlColor = "bg-rose-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]";
+                mlTextColor = "text-rose-500";
+                mlConfidenceBar.className = "bg-rose-500 h-full transition-all duration-300";
+            } else if (data.ml_risk_prediction === "HIGH") {
+                mlColor = "bg-orange-500 shadow-[0_0_10px_rgba(249,115,22,0.5)]";
+                mlTextColor = "text-orange-500";
+                mlConfidenceBar.className = "bg-orange-500 h-full transition-all duration-300";
+            } else if (data.ml_risk_prediction === "MEDIUM") {
+                mlColor = "bg-amber-500 shadow-[0_0_10px_rgba(245,158,11,0.5)]";
+                mlTextColor = "text-amber-500";
+                mlConfidenceBar.className = "bg-amber-500 h-full transition-all duration-300";
+            } else if (data.ml_risk_prediction === "LOW") {
+                mlColor = "bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.5)]";
+                mlTextColor = "text-green-500";
+                mlConfidenceBar.className = "bg-green-500 h-full transition-all duration-300";
+            } else if (data.ml_risk_prediction === "SECURE") {
+                mlColor = "bg-emerald-400 shadow-[0_0_12px_rgba(0,240,255,0.6)]";
+                mlTextColor = "text-emerald-400";
+                mlConfidenceBar.className = "bg-cyan-400 h-full transition-all duration-300";
+            }
+            mlRiskIndicator.className = `w-3.5 h-3.5 rounded-full ${mlColor}`;
+            mlRiskText.className = `text-xl font-bold tracking-wide font-mono ${mlTextColor}`;
+
+            // Update Crack Times
+            if (isBackendOnline && data.online_throttled_seconds !== undefined) {
+                crackOnline.innerText = data.crack_time_formatted; // Fallback representation
+                crackSlow.innerText = formatTime(data.offline_slow_hash_seconds || 0);
+                crackFast.innerText = formatTime(data.offline_fast_hash_seconds || 0);
+                crackAI.innerText = formatTime(data.ai_assisted_seconds || 0);
+            } else if (data.fallback_crack_times) {
+                crackOnline.innerText = data.fallback_crack_times.online;
+                crackSlow.innerText = data.fallback_crack_times.slow;
+                crackFast.innerText = data.fallback_crack_times.fast;
+                crackAI.innerText = data.fallback_crack_times.ai;
+            }
+            
+            // Update XAI Brief
+            xaiBrief.innerHTML = data.xai_explanation;
+            
+            // Build Vulnerability Tags
+            vulnTags.innerHTML = "";
+            if (data.dictionary_matched) {
+                vulnTags.innerHTML += `<span class="px-2.5 py-0.5 rounded text-[10px] font-bold bg-rose-950/80 text-rose-400 border border-rose-800">DICTIONARY_WORD</span>`;
+            }
+            if (data.patterns_detected && data.patterns_detected.length > 0) {
+                const types = new Set(data.patterns_detected.map(p => p.pattern_type));
+                types.forEach(t => {
+                    vulnTags.innerHTML += `<span class="px-2.5 py-0.5 rounded text-[10px] font-bold bg-orange-950/80 text-orange-400 border border-orange-800">${t}</span>`;
+                });
+            }
+            if (data.personal_info_exposed && data.personal_info_exposed.length > 0) {
+                vulnTags.innerHTML += `<span class="px-2.5 py-0.5 rounded text-[10px] font-bold bg-fuchsia-950/80 text-fuchsia-400 border border-fuchsia-800">OSINT_LEAK</span>`;
+            }
+            if (pwdInput.value.length > 0 && !data.dictionary_matched && (!data.patterns_detected || data.patterns_detected.length === 0)) {
+                vulnTags.innerHTML += `<span class="px-2.5 py-0.5 rounded text-[10px] font-bold bg-emerald-950/80 text-emerald-400 border border-emerald-800">COMPLEX_STRUCTURE</span>`;
+            }
+            
+            // Build Recommendations
+            recsContainer.innerHTML = "";
+            if (data.recommendations && data.recommendations.length > 0) {
+                data.recommendations.forEach(r => {
+                    let badgeColor = "text-slate-400 bg-slate-900 border-slate-700";
+                    if (r.priority === "HIGH") badgeColor = "text-rose-400 bg-rose-950/30 border-rose-900";
+                    if (r.priority === "MEDIUM") badgeColor = "text-amber-400 bg-amber-950/30 border-amber-900";
+                    
+                    recsContainer.innerHTML += `
+                        <div class="p-2 border rounded-lg flex items-start gap-2 ${badgeColor}">
+                            <i data-lucide="alert-triangle" class="w-4 h-4 mt-0.5 flex-shrink-0"></i>
+                            <div>
+                                <p class="leading-tight">${r.recommendation_text}</p>
+                            </div>
+                        </div>
+                    `;
+                });
+                lucide.createIcons();
+            } else {
+                recsContainer.innerHTML = `<div class="text-emerald-400 text-center py-6 flex flex-col items-center gap-1"><i data-lucide="shield-check" class="w-6 h-6"></i> Excellent password. No threats detected.</div>`;
+                lucide.createIcons();
+            }
+            
+            // Update Radar Chart Visualizer
+            updateRadarChart(data);
+        }
+
+        // 5. Radar Chart Rendering via Chart.js
+        function updateRadarChart(auditData) {
+            const canvas = document.getElementById('radarChart');
+            
+            // Extract ratios from audit data
+            // Metrics range 0 (poor) to 100 (excellent)
+            const lengthVal = Math.min(100, (pwdInput.value.length / 18) * 100);
+            const entropyVal = Math.min(100, (auditData.effective_entropy / 80) * 100);
+            const uniquenessVal = (auditData.security_score > 0) ? Math.round((auditData.entropy_score / (auditData.entropy_score + 1)) * 100) : 0;
+            const dictVal = auditData.dictionary_matched ? 0 : 100;
+            const patternVal = Math.max(0, 100 - (auditData.patterns_detected ? auditData.patterns_detected.length * 25 : 0));
+            const osintVal = Math.max(0, 100 - (auditData.personal_info_exposed ? auditData.personal_info_exposed.length * 35 : 0));
+            
+            const chartData = [lengthVal, entropyVal, uniquenessVal, dictVal, patternVal, osintVal];
+            
+            if (radarChartInstance) {
+                radarChartInstance.data.datasets[0].data = chartData;
+                radarChartInstance.update();
+                return;
+            }
+            
+            radarChartInstance = new Chart(canvas, {
+                type: 'radar',
+                data: {
+                    labels: ['Length', 'Entropy', 'Uniqueness', 'Dict Resistance', 'No Patterns', 'OSINT Isolation'],
+                    datasets: [{
+                        label: 'Credential Defense Index',
+                        data: chartData,
+                        fill: true,
+                        backgroundColor: 'rgba(0, 240, 255, 0.15)',
+                        borderColor: '#00F0FF',
+                        pointBackgroundColor: '#F000FF',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: '#00F0FF',
+                        borderWidth: 1.5
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    scales: {
+                        r: {
+                            angleLines: { color: 'rgba(255, 255, 255, 0.08)' },
+                            grid: { color: 'rgba(255, 255, 255, 0.08)' },
+                            pointLabels: {
+                                color: '#94A3B8',
+                                font: { family: 'Outfit', size: 9 }
+                            },
+                            ticks: { display: false, maxTicksLimit: 5 },
+                            min: 0,
+                            max: 100
+                        }
+                    },
+                    plugins: {
+                        legend: { display: false }
+                    }
+                }
+            });
+        }
+
+        // 6. Handle Password Audit Execution
+        async function runAudit() {
+            const pwd = pwdInput.value;
+            
+            if (pwd.length === 0) {
+                updateDashboard(getZeroStateResponse());
+                return;
+            }
+            
+            const payload = {
+                password: pwd,
+                username: username.value || null,
+                email: email.value || null,
+                first_name: firstName.value || null,
+                last_name: lastName.value || null,
+                organization: orgName.value || null,
+                mode: auditMode.value
+            };
+            
+            if (isBackendOnline) {
+                try {
+                    const response = await fetch(`${apiHost}/api/v1/audit`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    if (response.ok) {
+                        const data = await response.json();
+                        updateDashboard(data);
+                    } else {
+                        console.error("[API] Audit failed. Switching to fallback.");
+                        const localData = clientSideFallbackAudit(pwd, payload.username, payload.email, payload.first_name, payload.last_name, payload.organization);
+                        updateDashboard(localData);
+                    }
+                } catch (err) {
+                    const localData = clientSideFallbackAudit(pwd, payload.username, payload.email, payload.first_name, payload.last_name, payload.organization);
+                    updateDashboard(localData);
+                }
+            } else {
+                const localData = clientSideFallbackAudit(pwd, payload.username, payload.email, payload.first_name, payload.last_name, payload.organization);
+                updateDashboard(localData);
+            }
+        }
+
+        // Event Listeners for real-time audits
+        pwdInput.addEventListener('input', runAudit);
+        [username, email, firstName, lastName, orgName, auditMode].forEach(el => {
+            el.addEventListener('change', runAudit);
+            el.addEventListener('input', runAudit);
+        });
+
+        // Toggle visibility
+        toggleVisibility.addEventListener('click', () => {
+            if (pwdInput.type === 'password') {
+                pwdInput.type = 'text';
+                toggleVisibility.innerHTML = `<i data-lucide="eye-off" class="w-5 h-5"></i>`;
+            } else {
+                pwdInput.type = 'password';
+                toggleVisibility.innerHTML = `<i data-lucide="eye" class="w-5 h-5"></i>`;
+            }
+            lucide.createIcons();
+        });
+
+        // 7. Secure Password Generation Suggestions
+        btnPassphrase.addEventListener('click', () => {
+            const adjs = ["correct", "battery", "horse", "staple", "shadow", "cyber", "quantum", "crystal", "omega", "vector"];
+            const nouns = ["rocket", "planet", "dinosaur", "matrix", "scanner", "firewall", "router", "protocol", "galaxy", "carbon"];
+            const syms = ["!", "@", "#", "$", "%", "*"];
+            
+            // Build random combination
+            let words = [];
+            for (let k=0; k<4; k++) {
+                let wList = k % 2 === 0 ? adjs : nouns;
+                words.push(wList[Math.floor(Math.random() * wList.length)]);
+            }
+            const passphrase = words.join("-") + Math.floor(Math.random()*100) + syms[Math.floor(Math.random()*syms.length)];
+            
+            pwdInput.value = passphrase;
+            pwdInput.type = 'text';
+            toggleVisibility.innerHTML = `<i data-lucide="eye-off" class="w-5 h-5"></i>`;
+            lucide.createIcons();
+            runAudit();
+        });
+
+        btnRandom.addEventListener('click', () => {
+            const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()_+-=[]{}|;:,.<>?";
+            let result = "";
+            for (let i = 0; i < 16; i++) {
+                result += chars.charAt(Math.floor(Math.random() * chars.length));
+            }
+            pwdInput.value = result;
+            pwdInput.type = 'text';
+            toggleVisibility.innerHTML = `<i data-lucide="eye-off" class="w-5 h-5"></i>`;
+            lucide.createIcons();
+            runAudit();
+        });
+
+        // 8. Dynamic File Exporters
+        btnPDF.addEventListener('click', () => {
+            const pwd = pwdInput.value;
+            if (!pwd) {
+                alert("Please type a password to export the report.");
+                return;
+            }
+            
+            if (isBackendOnline) {
+                const params = new URLSearchParams({
+                    password: pwd,
+                    username: username.value || "",
+                    email: email.value || "",
+                    first_name: firstName.value || "",
+                    last_name: lastName.value || "",
+                    organization: orgName.value || ""
+                });
+                window.location.href = `${apiHost}/api/v1/export/pdf?${params.toString()}`;
+            } else {
+                alert("API is offline. PDF generation requires reportlab on the FastAPI backend. Downloading CSV summary instead.");
+                downloadCSVSummaryDirectly();
+            }
+        });
+
+        btnCSV.addEventListener('click', () => {
+            const pwd = pwdInput.value;
+            if (!pwd) {
+                alert("Please type a password to export.");
+                return;
+            }
+            if (isBackendOnline) {
+                const params = new URLSearchParams({
+                    password: pwd,
+                    username: username.value || "",
+                    email: email.value || "",
+                    first_name: firstName.value || "",
+                    last_name: lastName.value || "",
+                    organization: orgName.value || ""
+                });
+                window.location.href = `${apiHost}/api/v1/export/csv?${params.toString()}`;
+            } else {
+                downloadCSVSummaryDirectly();
+            }
+        });
+
+        function downloadCSVSummaryDirectly() {
+            const pwd = pwdInput.value;
+            const auditData = clientSideFallbackAudit(pwd, username.value, email.value, firstName.value, lastName.value, orgName.value);
+            
+            let csvContent = "data:text/csv;charset=utf-8,";
+            csvContent += "Password,Security Score,Entropy,Risk Level,Crack Time,XAI Explanation\n";
+            csvContent += `"${pwd}",${auditData.security_score},${auditData.effective_entropy},"${auditData.risk_level}","${auditData.crack_time_formatted}","${auditData.xai_explanation.replace(/"/g, '""')}"\n`;
+            
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            link.setAttribute("download", "AI_Password_Audit_Report.csv");
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // 9. Comparison Lab Logic
+        btnCompare.addEventListener('click', async () => {
+            const pwds = [
+                document.getElementById('compPwd1').value,
+                document.getElementById('compPwd2').value,
+                document.getElementById('compPwd3').value,
+                document.getElementById('compPwd4').value
+            ].filter(p => p.length > 0);
+            
+            if (pwds.length === 0) {
+                alert("Please fill at least one password in the comparison slots.");
+                return;
+            }
+            
+            const payload = {
+                passwords: pwds,
+                username: username.value || null,
+                email: email.value || null,
+                first_name: firstName.value || null,
+                last_name: lastName.value || null,
+                organization: orgName.value || null
+            };
+            
+            let comparisonData = [];
+            
+            if (isBackendOnline) {
+                try {
+                    const response = await fetch(`${apiHost}/api/v1/compare`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(payload)
+                    });
+                    if (response.ok) {
+                        const data = await response.json();
+                        comparisonData = data.comparisons;
+                    }
+                } catch(e) {
+                    console.warn("[API] Comparison fetch failed, running local browser comparator.");
+                }
+            }
+            
+            // In-browser mock comparator if API failed/offline
+            if (comparisonData.length === 0) {
+                const rawItems = pwds.map(p => {
+                    const aud = clientSideFallbackAudit(p, payload.username, payload.email, payload.first_name, payload.last_name, payload.organization);
+                    return {
+                        password: p,
+                        security_score: aud.security_score,
+                        entropy_score: aud.effective_entropy,
+                        risk_level: aud.risk_level,
+                        crack_time_formatted: aud.crack_time_formatted
+                    };
+                });
+                rawItems.sort((a,b) => (-a.security_score - b.security_score || -a.entropy_score - b.entropy_score));
+                comparisonData = rawItems.map((item, idx) => ({ ...item, rank: idx + 1 }));
+            }
+            
+            // Render rows
+            compTable.innerHTML = "";
+            comparisonData.forEach(item => {
+                let badgeClass = "text-slate-400 bg-slate-900 border-slate-700";
+                if (item.risk_level === "CRITICAL") badgeClass = "text-rose-400 bg-rose-950/40 border border-rose-900";
+                if (item.risk_level === "HIGH") badgeClass = "text-orange-400 bg-orange-950/40 border border-orange-900";
+                if (item.risk_level === "MEDIUM") badgeClass = "text-amber-400 bg-amber-950/40 border border-amber-900";
+                if (item.risk_level === "LOW") badgeClass = "text-green-400 bg-green-950/40 border border-green-900";
+                if (item.risk_level === "SECURE") badgeClass = "text-cyan-400 bg-cyan-950/40 border border-cyan-800 shadow-[0_0_8px_rgba(0,240,255,0.2)]";
+                
+                let rankClass = "text-slate-400";
+                if (item.rank === 1) rankClass = "text-cyan-400 font-extrabold";
+                
+                compTable.innerHTML += `
+                    <tr class="border-b border-slate-850 hover:bg-slate-900/30 transition-colors">
+                        <td class="p-3 font-bold font-mono ${rankClass}">#${item.rank}</td>
+                        <td class="p-3 font-mono text-slate-100">${item.password}</td>
+                        <td class="p-3 font-bold">${item.security_score}</td>
+                        <td class="p-3 font-mono">${item.entropy_score.toFixed(1)} bits</td>
+                        <td class="p-3"><span class="px-2.5 py-0.5 rounded text-[10px] font-bold ${badgeClass}">${item.risk_level}</span></td>
+                        <td class="p-3 text-right font-mono text-slate-400">${item.crack_time_formatted}</td>
+                    </tr>
+                `;
+            });
+        });
+
+        // Initialize zero state
+        updateCircleGauge(0);
+    </script>
+
+</body>
+</html>
